@@ -1,0 +1,260 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); direction: rtl; }
+.app { padding: 1rem; max-width: 1200px; margin: 0 auto; }
+.hero { background: linear-gradient(135deg, #1a6b4a 0%, #0f4d36 100%); border-radius: var(--border-radius-lg); padding: 2rem 1.5rem; margin-bottom: 1.5rem; text-align: center; }
+.hero h1 { color: #fff; font-size: 22px; font-weight: 500; margin-bottom: 0.5rem; }
+.hero p { color: rgba(255,255,255,0.75); font-size: 14px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.tab { padding: 8px 16px; border-radius: 20px; border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-secondary); cursor: pointer; font-size: 14px; transition: all 0.15s; }
+.tab.active { background: #1a6b4a; color: #fff; border-color: #1a6b4a; }
+.tab:hover:not(.active) { background: var(--color-background-secondary); }
+.search-bar { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+.search-bar input { flex: 1; padding: 10px 14px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); font-size: 14px; }
+.search-bar input:focus { outline: none; border-color: #1a6b4a; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; transition: border-color 0.15s; }
+.card:hover { border-color: var(--color-border-secondary); }
+.card-img { width: 100%; height: 160px; object-fit: cover; font-size: 48px; display: flex; align-items: center; justify-content: center; }
+.card-body { padding: 1rem; }
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.card-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+.fav-btn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 2px; line-height: 1; }
+.category-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: #e1f5ee; color: #0f6e56; margin-bottom: 8px; display: inline-block; }
+.card-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; margin-bottom: 10px; }
+.note-area { width: 100%; padding: 8px 10px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-secondary); color: var(--color-text-primary); font-size: 13px; resize: vertical; min-height: 60px; font-family: var(--font-sans); direction: rtl; }
+.note-area:focus { outline: none; border-color: #1a6b4a; }
+.save-note-btn { margin-top: 6px; padding: 6px 14px; border-radius: var(--border-radius-md); background: #1a6b4a; color: #fff; border: none; cursor: pointer; font-size: 13px; }
+.save-note-btn:hover { background: #155c3e; }
+.note-saved { font-size: 12px; color: #0f6e56; margin-top: 4px; display: none; }
+.add-modal-bg { position: relative; min-height: 500px; background: rgba(0,0,0,0.35); border-radius: var(--border-radius-lg); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal { background: var(--color-background-primary); border-radius: var(--border-radius-lg); border: 0.5px solid var(--color-border-tertiary); padding: 1.5rem; width: 100%; max-width: 480px; }
+.modal h2 { font-size: 18px; font-weight: 500; margin-bottom: 1.25rem; color: var(--color-text-primary); }
+.form-group { margin-bottom: 1rem; }
+.form-group label { font-size: 13px; color: var(--color-text-secondary); display: block; margin-bottom: 5px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 9px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); font-size: 14px; font-family: var(--font-sans); direction: rtl; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #1a6b4a; }
+.form-group textarea { resize: vertical; min-height: 80px; }
+.btn-primary { padding: 10px 24px; background: #1a6b4a; color: #fff; border: none; border-radius: var(--border-radius-md); cursor: pointer; font-size: 14px; width: 100%; }
+.btn-primary:hover { background: #155c3e; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--color-text-secondary); }
+.empty-state .icon { font-size: 40px; margin-bottom: 1rem; }
+.stats-bar { display: flex; gap: 12px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.stat-card { flex: 1; min-width: 100px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; }
+.stat-card .val { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+.stat-card .lbl { font-size: 12px; color: var(--color-text-secondary); }
+.color-map { background: #f0f9f5; }
+.emoji-bg { display: flex; align-items: center; justify-content: center; font-size: 52px; }
+@media (max-width: 500px) { .grid { grid-template-columns: 1fr; } .stats-bar { gap: 8px; } }
+</style>
+
+<div class="app" id="app">
+  <div class="hero">
+    <h1>مكة المكرمة السياحية</h1>
+    <p>اكتشف أجمل الأماكن وأبرز المعالم التاريخية والدينية</p>
+  </div>
+  <div class="stats-bar" id="statsBar"></div>
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('all')">جميع الأماكن</button>
+    <button class="tab" onclick="setTab('favorites')">المفضلة</button>
+    <button class="tab" onclick="setTab('add')">إضافة مكان جديد</button>
+  </div>
+  <div id="tabContent"></div>
+</div>
+
+<script>
+const DEFAULT_PLACES = [
+  { id: 1, name: "المسجد الحرام", category: "ديني", desc: "أقدس بقاع الأرض وأكبر مساجد العالم، يضم الكعبة المشرفة والمطاف ومقام إبراهيم وزمزم.", emoji: "🕋", userAdded: false },
+  { id: 2, name: "الكعبة المشرفة", category: "ديني", desc: "بيت الله الحرام وقبلة المسلمين حول العالم، تتوسط المسجد الحرام وتُكسى بالكسوة السوداء.", emoji: "🕌", userAdded: false },
+  { id: 3, name: "جبل النور وغار حراء", category: "تاريخي", desc: "الجبل الذي نزل فيه أول وحي على النبي محمد ﷺ في غار حراء. ارتفاعه نحو 640 متراً.", emoji: "⛰️", userAdded: false },
+  { id: 4, name: "جبل ثور", category: "تاريخي", desc: "الجبل الذي اختبأ فيه النبي ﷺ وصاحبه أبو بكر الصديق خلال هجرته إلى المدينة المنورة.", emoji: "🏔️", userAdded: false },
+  { id: 5, name: "منى", category: "ديني", desc: "وادٍ يقع بين مكة المكرمة وعرفات، يمتلئ بالحجاج في موسم الحج ويضم جمرات رمي الحجارة.", emoji: "🏕️", userAdded: false },
+  { id: 6, name: "عرفات", category: "ديني", desc: "سهل يبعد عن مكة 22 كم، يُعد الوقوف فيه ركناً أساسياً في أداء فريضة الحج.", emoji: "🌄", userAdded: false },
+  { id: 7, name: "برج ساعة مكة", category: "معماري", desc: "أحد أطول الأبراج في العالم، يقع بمجمع أبراج البيت المطل على المسجد الحرام مباشرةً.", emoji: "🏙️", userAdded: false },
+  { id: 8, name: "متحف الحرمين الشريفين", category: "ثقافي", desc: "متحف يوثق تاريخ المسجد الحرام والمسجد النبوي وتطورهما عبر العصور المختلفة.", emoji: "🏛️", userAdded: false },
+  { id: 9, name: "مسجد الجن", category: "ديني", desc: "المسجد الذي يُقال إن نفراً من الجن استمعوا فيه لتلاوة القرآن على النبي ﷺ.", emoji: "🕌", userAdded: false },
+  { id: 10, name: "المزدلفة", category: "ديني", desc: "منطقة تقع بين منى وعرفات، يبيت فيها الحجاج ليلة العيد ويجمعون منها حصى الجمرات.", emoji: "🌙", userAdded: false },
+  { id: 11, name: "بئر زمزم", category: "ديني", desc: "بئر مقدسة داخل المسجد الحرام تنبع بمياه زمزم المباركة منذ آلاف السنين.", emoji: "💧", userAdded: false },
+  { id: 12, name: "أبراج البيت", category: "معماري", desc: "مجمع أبراج فندقية ضخمة على بعد خطوات من المسجد الحرام تضم فنادق ومراكز تسوق.", emoji: "🏗️", userAdded: false },
+];
+
+let db;
+let currentTab = 'all';
+let searchQuery = '';
+
+async function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('MakkahTourism', 2);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('places')) d.createObjectStore('places', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('favorites')) d.createObjectStore('favorites', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('notes')) d.createObjectStore('notes', { keyPath: 'id' });
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getAll(store) {
+  return new Promise(resolve => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
+  });
+}
+
+async function put(store, val) {
+  return new Promise(resolve => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(val);
+    tx.oncomplete = resolve;
+  });
+}
+
+async function del(store, key) {
+  return new Promise(resolve => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = resolve;
+  });
+}
+
+async function initData() {
+  const existing = await getAll('places');
+  if (existing.length === 0) {
+    for (const p of DEFAULT_PLACES) await put('places', p);
+  }
+}
+
+async function getAllPlaces() { return getAll('places'); }
+async function getFavorites() { return getAll('favorites'); }
+async function getNotes() { return getAll('notes'); }
+
+async function toggleFavorite(id) {
+  const favs = await getFavorites();
+  const isFav = favs.some(f => f.id === id);
+  if (isFav) await del('favorites', id);
+  else await put('favorites', { id });
+  render();
+}
+
+async function saveNote(id, text) {
+  await put('notes', { id, text });
+  const el = document.getElementById('saved-' + id);
+  if (el) { el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 2000); }
+}
+
+async function addPlace(place) {
+  const places = await getAllPlaces();
+  const newId = Date.now();
+  await put('places', { ...place, id: newId, userAdded: true });
+  render();
+}
+
+function setTab(tab) {
+  currentTab = tab;
+  searchQuery = '';
+  render();
+}
+
+async function render() {
+  const [places, favs, notes] = await Promise.all([getAllPlaces(), getFavorites(), getNotes()]);
+  const favIds = new Set(favs.map(f => f.id));
+  const notesMap = Object.fromEntries(notes.map(n => [n.id, n.text]));
+
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['all','favorites','add'][i] === currentTab);
+  });
+
+  const statsBar = document.getElementById('statsBar');
+  const userAdded = places.filter(p => p.userAdded).length;
+  statsBar.innerHTML = `
+    <div class="stat-card"><div class="val">${places.length}</div><div class="lbl">إجمالي الأماكن</div></div>
+    <div class="stat-card"><div class="val">${favIds.size}</div><div class="lbl">المفضلة</div></div>
+    <div class="stat-card"><div class="val">${notes.length}</div><div class="lbl">ملاحظات</div></div>
+    <div class="stat-card"><div class="val">${userAdded}</div><div class="lbl">أضفتها أنت</div></div>
+  `;
+
+  const content = document.getElementById('tabContent');
+
+  if (currentTab === 'add') {
+    content.innerHTML = `
+      <div class="add-modal-bg">
+        <div class="modal">
+          <h2>إضافة مكان سياحي جديد</h2>
+          <div class="form-group"><label>اسم المكان *</label><input id="f-name" placeholder="مثال: مسجد بلال" /></div>
+          <div class="form-group"><label>الفئة</label>
+            <select id="f-cat">
+              <option>ديني</option><option>تاريخي</option><option>معماري</option><option>ثقافي</option><option>طبيعي</option><option>أخرى</option>
+            </select>
+          </div>
+          <div class="form-group"><label>وصف المكان</label><textarea id="f-desc" placeholder="اكتب وصفاً مختصراً..."></textarea></div>
+          <div class="form-group"><label>رمز تعبيري (emoji)</label><input id="f-emoji" placeholder="🕌" style="width:80px" /></div>
+          <button class="btn-primary" onclick="submitAdd()">إضافة المكان</button>
+          <p id="add-err" style="color:var(--color-text-danger);font-size:13px;margin-top:8px;display:none">يرجى إدخال اسم المكان</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  let list = places;
+  if (currentTab === 'favorites') list = places.filter(p => favIds.has(p.id));
+  if (searchQuery) list = list.filter(p => p.name.includes(searchQuery) || p.desc.includes(searchQuery) || p.category.includes(searchQuery));
+
+  let html = `<div class="search-bar"><input placeholder="ابحث عن مكان..." oninput="searchQ(this.value)" value="${searchQuery}" /></div>`;
+
+  if (list.length === 0) {
+    html += `<div class="empty-state"><div class="icon">${currentTab === 'favorites' ? '⭐' : '🔍'}</div>
+      <p>${currentTab === 'favorites' ? 'لم تضف أي مكان للمفضلة بعد' : 'لا توجد نتائج مطابقة'}</p></div>`;
+  } else {
+    html += `<div class="grid">`;
+    for (const p of list) {
+      const isFav = favIds.has(p.id);
+      const note = notesMap[p.id] || '';
+      html += `
+        <div class="card">
+          <div class="card-img emoji-bg color-map">${p.emoji || '📍'}</div>
+          <div class="card-body">
+            <div class="card-header">
+              <span class="card-title">${p.name}</span>
+              <button class="fav-btn" title="${isFav ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}" onclick="toggleFav(${p.id})">${isFav ? '⭐' : '☆'}</button>
+            </div>
+            <span class="category-badge">${p.category}</span>
+            <p class="card-desc">${p.desc}</p>
+            <textarea class="note-area" id="note-${p.id}" placeholder="أضف ملاحظتك عن هذا المكان...">${note}</textarea>
+            <button class="save-note-btn" onclick="saveNoteClick(${p.id})">حفظ الملاحظة</button>
+            <div class="note-saved" id="saved-${p.id}">✓ تم الحفظ</div>
+          </div>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+  content.innerHTML = html;
+}
+
+window.toggleFav = (id) => toggleFavorite(id);
+window.saveNoteClick = (id) => {
+  const el = document.getElementById('note-' + id);
+  if (el) saveNote(id, el.value);
+};
+window.searchQ = (q) => { searchQuery = q; render(); };
+window.setTab = setTab;
+window.submitAdd = () => {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { document.getElementById('add-err').style.display = 'block'; return; }
+  const cat = document.getElementById('f-cat').value;
+  const desc = document.getElementById('f-desc').value.trim() || 'لا يوجد وصف.';
+  const emoji = document.getElementById('f-emoji').value.trim() || '📍';
+  addPlace({ name, category: cat, desc, emoji });
+  setTab('all');
+};
+
+(async () => {
+  db = await openDB();
+  await initData();
+  render();
+})();
+</script>

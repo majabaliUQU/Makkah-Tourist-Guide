@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دليل مكة السياحي - IndexedDB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@100;400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans Arabic', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .animate-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-emerald-800 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <div class="p-2 bg-white/20 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight">دليل مكة السياحي</h1>
+            </div>
+            
+            <div class="relative flex-1 max-w-md">
+                <svg class="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input 
+                    type="text" 
+                    id="searchInput"
+                    placeholder="ابحث عن مكان..." 
+                    class="w-full bg-white/10 border border-white/20 rounded-full py-2 pr-10 pl-4 focus:outline-none focus:bg-white/20 transition-all text-white placeholder:text-white/60"
+                />
+            </div>
+
+            <button 
+                id="openModalBtn"
+                class="flex items-center gap-2 bg-white text-emerald-800 px-4 py-2 rounded-full font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                <span>إضافة مكان</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="bg-white border-b border-slate-200 sticky top-[136px] md:top-[76px] z-30">
+        <div class="max-w-6xl mx-auto px-4 flex">
+            <button 
+                id="tabAll"
+                class="flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 border-b-4 border-emerald-600 text-emerald-700"
+            >
+                الكل
+            </button>
+            <button 
+                id="tabFavorites"
+                class="flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-emerald-600"
+            >
+                المفضلة
+                <span id="favCount" class="hidden bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">0</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+        <div id="loading" class="flex items-center justify-center py-20">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+        </div>
+
+        <div id="placesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 hidden">
+            <!-- Cards will be injected here -->
+        </div>
+
+        <div id="emptyState" class="hidden text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+            <div class="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <h3 class="text-xl font-semibold text-slate-700 mb-2">لا يوجد أماكن للعرض</h3>
+            <p class="text-slate-500">حاول البحث عن شيء آخر أو أضف مكاناً جديداً.</p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 py-12 px-4 mt-auto">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span class="text-lg font-bold text-white">دليل مكة</span>
+            </div>
+            <p class="text-sm">جميع الحقوق محفوظة <span id="year"></span> - تعمل بنظام IndexedDB المحلي.</p>
+            <div class="flex gap-4">
+                <span class="text-xs uppercase tracking-widest bg-white/5 px-3 py-1 rounded">Offline Ready</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Add Place Modal -->
+    <div id="addModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="absolute inset-0 modal-overlay" id="closeModalOverlay"></div>
+        <div class="bg-white rounded-3xl w-full max-w-lg relative z-10 shadow-2xl overflow-hidden animate-in">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
+                <h2 class="text-xl font-bold text-emerald-900 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    إضافة مكان سياحي جديد
+                </h2>
+                <button id="closeModalBtn" class="p-2 hover:bg-emerald-100 rounded-full transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-800"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+            
+            <form id="addPlaceForm" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">اسم المكان</label>
+                    <input required id="newTitle" type="text" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="مثال: جبل ثور">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">التصنيف</label>
+                    <select id="newCategory" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="عام">عام</option>
+                        <option value="ديني">ديني</option>
+                        <option value="تاريخي">تاريخي</option>
+                        <option value="ترفيهي">ترفيهي</option>
+                        <option value="تسوق">تسوق</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">وصف قصير</label>
+                    <textarea required id="newDescription" rows="3" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="وصف مميزات هذا المكان السياحي..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">رابط الصورة (اختياري)</label>
+                    <input id="newImage" type="url" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left" dir="ltr" placeholder="https://example.com/image.jpg">
+                </div>
+
+                <div class="pt-4 flex gap-3">
+                    <button type="submit" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 shadow-md transition-all active:scale-95">إضافة المكان</button>
+                    <button type="button" id="cancelBtn" class="px-6 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logic Script -->
+    <script>
+        // Global State
+        const state = {
+            places: [],
+            userData: { favorites: [], notes: {} },
+            activeTab: 'all',
+            searchTerm: ''
+        };
+
+        const DB_NAME = 'MakkahGuideDB';
+        const DB_VERSION = 1;
+        let db;
+
+        const INITIAL_PLACES = [
+            { id: 1, title: "المسجد الحرام", description: "أقدس مكان على وجه الأرض، يضم الكعبة المشرفة ومقام إبراهيم وبئر زمزم.", image: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?q=80&w=1000&auto=format&fit=crop", category: "ديني" },
+            { id: 2, title: "جبل النور (غار حراء)", description: "المكان الذي نزل فيه الوحي على النبي محمد صلى الله عليه وسلم لأول مرة.", image: "https://images.unsplash.com/photo-1580418827493-f2b22c0a76cb?q=80&w=1000&auto=format&fit=crop", category: "تاريخي" },
+            { id: 3, title: "أبراج البيت (ساعة مكة)", description: "ثالث أطول ناطحة سحاب في العالم وتضم متحفاً فلكياً ومجمعاً تجارياً ضخماً.", image: "https://images.unsplash.com/photo-1549410103-67456d958564?q=80&w=1000&auto=format&fit=crop", category: "ترفيهي" },
+            { id: 4, title: "جبل عرفات", description: "مشعر مقدس يقف فيه الحجاج يوم التاسع من ذي الحجة، وهو ركن الحج الأعظم.", image: "https://images.unsplash.com/photo-1565711561500-47e39c76e6bc?q=80&w=1000&auto=format&fit=crop", category: "ديني" }
+        ];
+
+        // Elements
+        const placesGrid = document.getElementById('placesGrid');
+        const loadingEl = document.getElementById('loading');
+        const emptyState = document.getElementById('emptyState');
+        const searchInput = document.getElementById('searchInput');
+        const tabAll = document.getElementById('tabAll');
+        const tabFavorites = document.getElementById('tabFavorites');
+        const favCount = document.getElementById('favCount');
+        const addModal = document.getElementById('addModal');
+        const openModalBtn = document.getElementById('openModalBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const closeModalOverlay = document.getElementById('closeModalOverlay');
+        const addPlaceForm = document.getElementById('addPlaceForm');
+
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // 1. IndexedDB Initialization
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('places')) {
+                        db.createObjectStore('places', { keyPath: 'id', autoIncrement: true });
+                    }
+                    if (!db.objectStoreNames.contains('userData')) {
+                        db.createObjectStore('userData');
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve(db);
+                };
+
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        // 2. Data Operations
+        async function loadData() {
+            // Load Places
+            const placesTx = db.transaction('places', 'readonly');
+            const placesStore = placesTx.objectStore('places');
+            const placesRequest = placesStore.getAll();
+
+            placesRequest.onsuccess = async () => {
+                let places = placesRequest.result;
+                
+                // Seed if empty
+                if (places.length === 0) {
+                    const addTx = db.transaction('places', 'readwrite');
+                    const addStore = addTx.objectStore('places');
+                    for (const place of INITIAL_PLACES) {
+                        addStore.add(place);
+                    }
+                    places = INITIAL_PLACES;
+                }
+                state.places = places;
+
+                // Load User Data
+                const userTx = db.transaction('userData', 'readonly');
+                const userStore = userTx.objectStore('userData');
+                const favReq = userStore.get('favorites');
+                const notesReq = userStore.get('notes');
+
+                favReq.onsuccess = () => {
+                    state.userData.favorites = favReq.result || [];
+                    notesReq.onsuccess = () => {
+                        state.userData.notes = notesReq.result || {};
+                        loadingEl.classList.add('hidden');
+                        render();
+                    };
+                };
+            };
+        }
+
+        async function updateUserData(key, value) {
+            const tx = db.transaction('userData', 'readwrite');
+            const store = tx.objectStore('userData');
+            store.put(value, key);
+            state.userData[key] = value;
+            render();
+        }
+
+        async function addPlace(place) {
+            const tx = db.transaction('places', 'readwrite');
+            const store = tx.objectStore('places');
+            const request = store.add(place);
+            request.onsuccess = () => {
+                state.places.push({ ...place, id: request.result });
+                render();
+            };
+        }
+
+        // Logic Actions
+        function toggleFavorite(placeId) {
+            const isFav = state.userData.favorites.includes(placeId);
+            const newFavorites = isFav 
+                ? state.userData.favorites.filter(id => id !== placeId)
+                : [...state.userData.favorites, placeId];
+            updateUserData('favorites', newFavorites);
+        }
+
+        function saveNote(placeId, text) {
+            const newNotes = { ...state.userData.notes, [placeId]: text };
+            updateUserData('notes', newNotes);
+        }
+
+        // Rendering Logic
+        function render() {
+            let filtered = state.places;
+
+            // Apply Tab Filter
+            if (state.activeTab === 'favorites') {
+                filtered = filtered.filter(p => state.userData.favorites.includes(p.id));
+                tabFavorites.className = "flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 border-b-4 border-emerald-600 text-emerald-700";
+                tabAll.className = "flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-emerald-600";
+            } else {
+                tabAll.className = "flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 border-b-4 border-emerald-600 text-emerald-700";
+                tabFavorites.className = "flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 text-slate-500 hover:text-emerald-600";
+            }
+
+            // Apply Search Filter
+            if (state.searchTerm) {
+                const term = state.searchTerm.toLowerCase();
+                filtered = filtered.filter(p => 
+                    p.title.toLowerCase().includes(term) || 
+                    p.description.toLowerCase().includes(term)
+                );
+            }
+
+            // Update Counter
+            if (state.userData.favorites.length > 0) {
+                favCount.textContent = state.userData.favorites.length;
+                favCount.classList.remove('hidden');
+            } else {
+                favCount.classList.add('hidden');
+            }
+
+            // Update Grid
+            if (filtered.length === 0) {
+                placesGrid.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                placesGrid.classList.remove('hidden');
+                placesGrid.innerHTML = '';
+
+                filtered.forEach(place => {
+                    const isFav = state.userData.favorites.includes(place.id);
+                    const note = state.userData.notes[place.id] || '';
+                    
+                    const card = document.createElement('div');
+                    card.className = "bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col border border-slate-100 group animate-in";
+                    
+                    card.innerHTML = `
+                        <div class="relative h-56 overflow-hidden">
+                            <img src="${place.image}" alt="${place.title}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            
+                            <div class="absolute top-4 left-4">
+                                <button class="fav-btn p-3 rounded-full shadow-lg transition-all transform active:scale-95 ${isFav ? 'bg-red-500 text-white' : 'bg-white/90 text-slate-400 hover:text-red-500'}" data-id="${place.id}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                                </button>
+                            </div>
+
+                            <div class="absolute bottom-4 right-4">
+                                <span class="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">${place.category}</span>
+                            </div>
+                        </div>
+
+                        <div class="p-6 flex-1 flex flex-col">
+                            <h3 class="text-xl font-bold mb-2 text-emerald-900">${place.title}</h3>
+                            <p class="text-slate-600 text-sm leading-relaxed mb-4 flex-1">${place.description}</p>
+
+                            <div class="mt-4 pt-4 border-t border-slate-100">
+                                <div id="note-display-${place.id}" class="${note ? '' : 'hidden'}">
+                                    <div class="bg-yellow-50 p-3 rounded-xl border border-yellow-100 group/note relative">
+                                        <div class="flex items-center gap-1 text-yellow-700 mb-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/><path d="M15 3v5h5"/><path d="m7 11 5 5 5-5"/></svg>
+                                            <span class="text-[10px] font-bold">ملاحظتك:</span>
+                                        </div>
+                                        <p class="text-sm text-yellow-900 italic">"${note}"</p>
+                                        <button class="edit-note-btn absolute top-2 left-2 opacity-0 group-hover/note:opacity-100 text-slate-400 hover:text-emerald-600" data-id="${place.id}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <button class="add-note-btn text-emerald-600 text-xs flex items-center gap-1 font-medium hover:underline ${note ? 'hidden' : ''}" data-id="${place.id}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                    أضف ملاحظة خاصة
+                                </button>
+
+                                <div id="note-editor-${place.id}" class="hidden space-y-2 mt-2">
+                                    <textarea class="note-textarea w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20" placeholder="اكتب ملاحظتك هنا...">${note}</textarea>
+                                    <div class="flex gap-2">
+                                        <button class="save-note-btn bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700" data-id="${place.id}">حفظ</button>
+                                        <button class="cancel-note-btn bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-300" data-id="${place.id}">إلغاء</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    // Card Event Handlers
+                    card.querySelector('.fav-btn').onclick = () => toggleFavorite(place.id);
+                    
+                    card.querySelector('.add-note-btn').onclick = () => {
+                        document.getElementById(`note-editor-${place.id}`).classList.remove('hidden');
+                        card.querySelector('.add-note-btn').classList.add('hidden');
+                    };
+
+                    const editBtn = card.querySelector('.edit-note-btn');
+                    if (editBtn) {
+                        editBtn.onclick = () => {
+                            document.getElementById(`note-editor-${place.id}`).classList.remove('hidden');
+                            document.getElementById(`note-display-${place.id}`).classList.add('hidden');
+                        };
+                    }
+
+                    card.querySelector('.cancel-note-btn').onclick = () => {
+                        document.getElementById(`note-editor-${place.id}`).classList.add('hidden');
+                        if (state.userData.notes[place.id]) {
+                            document.getElementById(`note-display-${place.id}`).classList.remove('hidden');
+                        } else {
+                            card.querySelector('.add-note-btn').classList.remove('hidden');
+                        }
+                    };
+
+                    card.querySelector('.save-note-btn').onclick = () => {
+                        const text = card.querySelector('.note-textarea').value;
+                        saveNote(place.id, text.trim());
+                    };
+
+                    placesGrid.appendChild(card);
+                });
+            }
+        }
+
+        // Global Event Listeners
+        searchInput.oninput = (e) => {
+            state.searchTerm = e.target.value;
+            render();
+        };
+
+        tabAll.onclick = () => { state.activeTab = 'all'; render(); };
+        tabFavorites.onclick = () => { state.activeTab = 'favorites'; render(); };
+
+        openModalBtn.onclick = () => addModal.classList.remove('hidden');
+        
+        const closeModal = () => {
+            addModal.classList.add('hidden');
+            addPlaceForm.reset();
+        };
+
+        closeModalBtn.onclick = closeModal;
+        cancelBtn.onclick = closeModal;
+        closeModalOverlay.onclick = closeModal;
+
+        addPlaceForm.onsubmit = (e) => {
+            e.preventDefault();
+            const title = document.getElementById('newTitle').value;
+            const category = document.getElementById('newCategory').value;
+            const description = document.getElementById('newDescription').value;
+            const image = document.getElementById('newImage').value || 'https://images.unsplash.com/photo-1549410103-67456d958564?q=80&w=1000&auto=format&fit=crop';
+
+            addPlace({ title, category, description, image });
+            closeModal();
+        };
+
+        // Start App
+        initDB().then(loadData).catch(console.error);
+
+    </script>
+</body>
+</html>

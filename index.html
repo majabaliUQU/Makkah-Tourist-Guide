@@ -1,0 +1,483 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  query, 
+  addDoc,
+  updateDoc,
+  deleteDoc
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  Heart, 
+  MapPin, 
+  Plus, 
+  StickyNote, 
+  Search, 
+  Star, 
+  Home,
+  Menu,
+  X,
+  Trash2,
+  Info
+} from 'lucide-react';
+
+// Firebase configuration from environment
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'makkah-tourist-guide';
+
+// Initial data to seed if the collection is empty
+const INITIAL_PLACES = [
+  {
+    title: "المسجد الحرام",
+    description: "أقدس مكان على وجه الأرض، يضم الكعبة المشرفة ومقام إبراهيم وبئر زمزم.",
+    image: "https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?q=80&w=1000&auto=format&fit=crop",
+    category: "ديني"
+  },
+  {
+    title: "جبل النور (غار حراء)",
+    description: "المكان الذي نزل فيه الوحي على النبي محمد صلى الله عليه وسلم لأول مرة.",
+    image: "https://images.unsplash.com/photo-1580418827493-f2b22c0a76cb?q=80&w=1000&auto=format&fit=crop",
+    category: "تاريخي"
+  },
+  {
+    title: "أبراج البيت (ساعة مكة)",
+    description: "ثالث أطول ناطحة سحاب في العالم وتضم متحفاً فلكياً ومجمعاً تجارياً ضخماً.",
+    image: "https://images.unsplash.com/photo-1549410103-67456d958564?q=80&w=1000&auto=format&fit=crop",
+    category: "ترفيهي"
+  },
+  {
+    title: "جبل عرفات",
+    description: "مشعر مقدس يقف فيه الحجاج يوم التاسع من ذي الحجة، وهو ركن الحج الأعظم.",
+    image: "https://images.unsplash.com/photo-1565711561500-47e39c76e6bc?q=80&w=1000&auto=format&fit=crop",
+    category: "ديني"
+  }
+];
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [places, setPlaces] = useState([]);
+  const [userData, setUserData] = useState({ favorites: [], notes: {} });
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'favorites'
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newPlace, setNewPlace] = useState({ title: '', description: '', image: '', category: 'عام' });
+  const [editingNote, setEditingNote] = useState({ id: null, text: '' });
+
+  // 1. Authentication
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Auth error:", error);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Fetch Places (Public)
+  useEffect(() => {
+    if (!user) return;
+
+    const placesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'places');
+    
+    const unsubscribe = onSnapshot(placesCollection, (snapshot) => {
+      const placesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Seed initial data if empty
+      if (placesList.length === 0) {
+        INITIAL_PLACES.forEach(place => {
+          addDoc(placesCollection, place);
+        });
+      }
+      
+      setPlaces(placesList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore places error:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // 3. Fetch User Data (Private: Favorites and Notes)
+  useEffect(() => {
+    if (!user) return;
+
+    const userDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
+    
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUserData(docSnap.data());
+      } else {
+        // Init user profile
+        setDoc(userDocRef, { favorites: [], notes: {} });
+      }
+    }, (error) => {
+      console.error("Firestore user data error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Actions
+  const toggleFavorite = async (placeId) => {
+    if (!user) return;
+    const isFav = userData.favorites.includes(placeId);
+    const newFavorites = isFav 
+      ? userData.favorites.filter(id => id !== placeId)
+      : [...userData.favorites, placeId];
+    
+    const userDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
+    await updateDoc(userDocRef, { favorites: newFavorites });
+  };
+
+  const saveNote = async (placeId) => {
+    if (!user || !editingNote.text.trim()) return;
+    const newNotes = { ...userData.notes, [placeId]: editingNote.text };
+    
+    const userDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
+    await updateDoc(userDocRef, { notes: newNotes });
+    setEditingNote({ id: null, text: '' });
+  };
+
+  const addNewPlace = async (e) => {
+    e.preventDefault();
+    if (!newPlace.title || !newPlace.description) return;
+
+    const placesCollection = collection(db, 'artifacts', appId, 'public', 'data', 'places');
+    await addDoc(placesCollection, {
+      ...newPlace,
+      image: newPlace.image || 'https://images.unsplash.com/photo-1549410103-67456d958564?q=80&w=1000&auto=format&fit=crop'
+    });
+    
+    setNewPlace({ title: '', description: '', image: '', category: 'عام' });
+    setIsAddModalOpen(false);
+  };
+
+  const filteredPlaces = useMemo(() => {
+    let list = places;
+    if (activeTab === 'favorites') {
+      list = list.filter(p => userData.favorites.includes(p.id));
+    }
+    if (searchTerm) {
+      list = list.filter(p => 
+        p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        p.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return list;
+  }, [places, userData.favorites, activeTab, searchTerm]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col" dir="rtl">
+      {/* Header */}
+      <header className="bg-emerald-800 text-white shadow-lg sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <MapPin className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">دليل مكة السياحي</h1>
+          </div>
+          
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 w-5 h-5" />
+            <input 
+              type="text" 
+              placeholder="ابحث عن مكان..." 
+              className="w-full bg-white/10 border border-white/20 rounded-full py-2 pr-10 pl-4 focus:outline-none focus:bg-white/20 transition-all text-white placeholder:text-white/60"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 bg-white text-emerald-800 px-4 py-2 rounded-full font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
+            >
+              <Plus className="w-5 h-5" />
+              <span>إضافة مكان</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Tabs */}
+      <nav className="bg-white border-b border-slate-200 sticky top-[136px] md:top-[76px] z-30">
+        <div className="max-w-6xl mx-auto px-4 flex">
+          <button 
+            onClick={() => setActiveTab('all')}
+            className={`flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 ${activeTab === 'all' ? 'border-b-4 border-emerald-600 text-emerald-700' : 'text-slate-500 hover:text-emerald-600'}`}
+          >
+            <Home className="w-5 h-5" />
+            الكل
+          </button>
+          <button 
+            onClick={() => setActiveTab('favorites')}
+            className={`flex-1 md:flex-none px-8 py-4 font-medium transition-all flex items-center justify-center gap-2 ${activeTab === 'favorites' ? 'border-b-4 border-emerald-600 text-emerald-700' : 'text-slate-500 hover:text-emerald-600'}`}
+          >
+            <Heart className={`w-5 h-5 ${activeTab === 'favorites' ? 'fill-emerald-600' : ''}`} />
+            المفضلة
+            {userData.favorites.length > 0 && (
+              <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full">
+                {userData.favorites.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="max-w-6xl mx-auto px-4 py-8 flex-1 w-full">
+        {filteredPlaces.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
+            <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-700 mb-2">لا يوجد أماكن للعرض</h3>
+            <p className="text-slate-500">حاول البحث عن شيء آخر أو أضف مكاناً جديداً.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredPlaces.map((place) => (
+              <div key={place.id} className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col border border-slate-100 group">
+                {/* Image Section */}
+                <div className="relative h-56 overflow-hidden">
+                  <img 
+                    src={place.image} 
+                    alt={place.title} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => e.target.src = 'https://images.unsplash.com/photo-1549410103-67456d958564?q=80&w=1000&auto=format&fit=crop'}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  
+                  {/* Floating Action Buttons */}
+                  <div className="absolute top-4 left-4 flex flex-col gap-2">
+                    <button 
+                      onClick={() => toggleFavorite(place.id)}
+                      className={`p-3 rounded-full shadow-lg transition-all transform active:scale-95 ${userData.favorites.includes(place.id) ? 'bg-red-500 text-white' : 'bg-white/90 text-slate-400 hover:text-red-500'}`}
+                    >
+                      <Heart className={`w-5 h-5 ${userData.favorites.includes(place.id) ? 'fill-current' : ''}`} />
+                    </button>
+                  </div>
+
+                  <div className="absolute bottom-4 right-4">
+                    <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                      {place.category}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Content Section */}
+                <div className="p-6 flex-1 flex flex-col">
+                  <h3 className="text-xl font-bold mb-2 text-emerald-900">{place.title}</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed mb-4 flex-1">
+                    {place.description}
+                  </p>
+
+                  {/* Note Section */}
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    {editingNote.id === place.id ? (
+                      <div className="space-y-2">
+                        <textarea 
+                          autoFocus
+                          className="w-full text-sm p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                          placeholder="اكتب ملاحظتك هنا..."
+                          value={editingNote.text}
+                          onChange={(e) => setEditingNote({ ...editingNote, text: e.target.value })}
+                        />
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => saveNote(place.id)}
+                            className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-emerald-700"
+                          >
+                            حفظ الملاحظة
+                          </button>
+                          <button 
+                            onClick={() => setEditingNote({ id: null, text: '' })}
+                            className="bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-300"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between group/note">
+                        <div className="flex-1">
+                          {userData.notes[place.id] ? (
+                            <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-100">
+                              <div className="flex items-center gap-1 text-yellow-700 mb-1">
+                                <StickyNote className="w-3 h-3" />
+                                <span className="text-[10px] font-bold">ملاحظتك:</span>
+                              </div>
+                              <p className="text-sm text-yellow-900 italic">"{userData.notes[place.id]}"</p>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setEditingNote({ id: place.id, text: '' })}
+                              className="text-emerald-600 text-xs flex items-center gap-1 font-medium hover:underline"
+                            >
+                              <Plus className="w-3 h-3" />
+                              أضف ملاحظة خاصة
+                            </button>
+                          )}
+                        </div>
+                        {userData.notes[place.id] && (
+                          <button 
+                            onClick={() => setEditingNote({ id: place.id, text: userData.notes[place.id] })}
+                            className="opacity-0 group-hover/note:opacity-100 p-2 text-slate-400 hover:text-emerald-600 transition-opacity"
+                          >
+                            <Info className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-slate-400 py-12 px-4">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            <span className="text-lg font-bold text-white">دليل مكة</span>
+          </div>
+          <p className="text-sm">جميع الحقوق محفوظة {new Date().getFullYear()} - تم التطوير لخدمة زوار بيت الله الحرام.</p>
+          <div className="flex gap-4">
+            <span className="text-xs uppercase tracking-widest bg-white/5 px-3 py-1 rounded">Makkah v2.0</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* Add Place Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}></div>
+          <div className="bg-white rounded-3xl w-full max-w-lg relative z-10 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-emerald-50">
+              <h2 className="text-xl font-bold text-emerald-900 flex items-center gap-2">
+                <Plus className="w-6 h-6" />
+                إضافة مكان سياحي جديد
+              </h2>
+              <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-emerald-100 rounded-full transition-colors">
+                <X className="w-6 h-6 text-emerald-800" />
+              </button>
+            </div>
+            
+            <form onSubmit={addNewPlace} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">اسم المكان</label>
+                <input 
+                  required
+                  type="text" 
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="مثال: جبل ثور"
+                  value={newPlace.title}
+                  onChange={(e) => setNewPlace({...newPlace, title: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">التصنيف</label>
+                <select 
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={newPlace.category}
+                  onChange={(e) => setNewPlace({...newPlace, category: e.target.value})}
+                >
+                  <option value="عام">عام</option>
+                  <option value="ديني">ديني</option>
+                  <option value="تاريخي">تاريخي</option>
+                  <option value="ترفيهي">ترفيهي</option>
+                  <option value="تسوق">تسوق</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">وصف قصير</label>
+                <textarea 
+                  required
+                  rows="3"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  placeholder="وصف مميزات هذا المكان السياحي..."
+                  value={newPlace.description}
+                  onChange={(e) => setNewPlace({...newPlace, description: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">رابط الصورة (اختياري)</label>
+                <input 
+                  type="url" 
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left"
+                  dir="ltr"
+                  placeholder="https://example.com/image.jpg"
+                  value={newPlace.image}
+                  onChange={(e) => setNewPlace({...newPlace, image: e.target.value})}
+                />
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="submit"
+                  className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 shadow-md transition-all active:scale-95"
+                >
+                  إضافة المكان
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-6 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Global Notifications Mockup (CSS only) */}
+      <style>{`
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoom-in { from { transform: scale(0.95); } to { transform: scale(1); } }
+        .animate-in { animation: fade-in 0.2s ease-out, zoom-in 0.2s ease-out; }
+      `}</style>
+    </div>
+  );
+}
